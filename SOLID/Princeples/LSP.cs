@@ -22,6 +22,9 @@ public class LSP
         public override void GoTo(Vector3 destination)
         {
             //кря ;)
+            //WRONG 
+            //НЕПРАВИЛЬНО
+            
         }
     }
 }

@@ -1,10 +1,13 @@
+using System.Diagnostics.Contracts;
+using System.IO.Pipes;
+
 namespace SOLID.Princeples;
 
 public class DIP
 {
     public class DurakGame
     {
-        public enum Rank
+        public enum Suit
         {
             clubs = 0,
             diamonds = 1,
@@ -12,7 +15,7 @@ public class DIP
             sprades = 3
         }
 
-        public enum Suit
+        public enum Rank
         {
             Ace = 8,
             King = 7,
@@ -30,7 +33,7 @@ public class DIP
         public abstract class AbstractPlayer
         {
             public event Action Pass, AcceptDefeat;
-            public event Action<Card> ThrowCard;
+            public event Action<Card, int> ThrowCard;
 
             protected List<Card> _cards;
 
@@ -38,7 +41,7 @@ public class DIP
 
             public abstract void NotifyNextRound(Round round);
 
-            public abstract void NotifyPlayerThrowsCard(AbstractPlayer player, Card card);
+            public abstract void NotifyPlayerThrowsCard(AbstractPlayer player, Card card, int slotIndex);
 
             //Хорошо
             public abstract void NotifyGameEnded(GameEndResult gameEndResult);
@@ -48,19 +51,60 @@ public class DIP
             public abstract void NotifyGameEnded(IEnumerable<AbstractPlayer> winners);
         }
 
-        public abstract class Table
+        public abstract class Table : IDisposable
         {
-            protected AbstractPlayer[] _players;
+            protected List<AbstractPlayer> _players;
 
             protected Round _currentRound;
 
             protected Table(AbstractPlayer[] players)
             {
-                _players = players;
+                _players = new List<AbstractPlayer>(players);
+
+                foreach (var player in players)
+                {
+                    player.Pass += PlayerOnPass;
+                    player.AcceptDefeat += PlayerOnAcceptDefeat;
+                    player.ThrowCard += PlayerOnThrowCard;
+                }
+
+
                 TurnNextRound();
             }
 
-            public void TurnNextRound()
+            [Pure]
+            public AbstractPlayer NextFor(in AbstractPlayer player)
+            {
+                if (_players.Count < 2)
+                {
+                    throw new InvalidOperationException();
+                }
+
+                return _players[(_players.IndexOf(player) + 1) % _players.Count];
+            }
+
+            public void Dispose()
+            {
+                foreach (var player in _players)
+                {
+                    player.Pass -= PlayerOnPass;
+                    player.AcceptDefeat -= PlayerOnAcceptDefeat;
+                    player.ThrowCard -= PlayerOnThrowCard;
+                }
+            }
+
+            ~Table()
+            {
+                Dispose();
+            }
+
+            protected abstract void PlayerOnThrowCard(Card card, int slotIndex);
+
+            protected abstract void PlayerOnAcceptDefeat();
+
+            protected abstract void PlayerOnPass();
+
+            public virtual void TurnNextRound()
             {
                 //_currentRound = new Round(); //TODO
                 foreach (var abstractPlayer in _players)
